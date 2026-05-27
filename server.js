@@ -10,29 +10,65 @@ app.get("/", (req, res) => {
 
 app.post("/send", async (req, res) => {
   try {
-    const { text } = req.body;
+    const { botToken, chatIds, text } = req.body;
 
-    const response = await fetch(
-      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chat_id: process.env.TELEGRAM_CHAT_ID,
-          text,
-        }),
-      }
-    );
+    if (!botToken) {
+      return res.status(400).json({
+        success: false,
+        error: "botToken is required"
+      });
+    }
 
-    const data = await response.json();
+    if (!chatIds || !Array.isArray(chatIds) || chatIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "chatIds array is required"
+      });
+    }
 
-    res.status(response.status).json(data);
-  } catch (err) {
-    res.status(500).json({
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        error: "text is required"
+      });
+    }
+
+    const results = [];
+
+    for (const chatId of chatIds) {
+      const response = await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      results.push({
+        chatId,
+        success: response.ok,
+        telegramResponse: data
+      });
+    }
+
+    return res.json({
+      success: true,
+      totalRecipients: chatIds.length,
+      results
+    });
+
+  } catch (error) {
+    return res.status(500).json({
       success: false,
-      error: err.message,
+      error: error.message
     });
   }
 });
